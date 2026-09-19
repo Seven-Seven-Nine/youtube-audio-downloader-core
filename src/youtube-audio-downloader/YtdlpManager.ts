@@ -1,16 +1,35 @@
 import path from "node:path";
+import fs from "node:fs";
 import { YtDlp, type ArgsOptions, type DownloadFinishResult } from "ytdlp-nodejs";
 import logger from "./logger.ts";
-import ffmpegPath from "ffmpeg-static";
 
 export default class YtdlpManager {
-    private readonly ytdlp: YtDlp = new YtDlp();
+    private readonly ytdlp: YtDlp;
+    private readonly ytdlpBinaryPath: string;
+    private readonly ffmpegBinaryPath: string;
 
-    private getOptionsForDownloadingMp3(): ArgsOptions {
-        if (!ffmpegPath) {
-            throw new Error("Не удалось определить путь к ffmpeg-static");
+    constructor() {
+        const isWindows: boolean = process.platform === "win32";
+        const binaryFilenameYtdlp: string = isWindows ? "yt-dlp.exe" : "yt-dlp_linux";
+        const binaryFilenameFfmpeg: string = isWindows ? "ffmpeg-windows/ffmpeg.exe" : "ffmpeg-linux/ffmpeg";
+
+        this.ytdlpBinaryPath = path.resolve(import.meta.dirname ?? __dirname, "..", "bin", binaryFilenameYtdlp);
+        this.ffmpegBinaryPath = path.resolve(import.meta.dirname ?? __dirname, "..", "bin", binaryFilenameFfmpeg);
+
+        logger.debug(`Сформированный путь до бинарного файла yt-dlp: "${this.ytdlpBinaryPath}".`);
+        logger.debug(`Сформированный путь до бинарного файла ffmpeg: "${this.ffmpegBinaryPath}".`);
+
+        if (!fs.existsSync(this.ytdlpBinaryPath)) {
+            logger.error(`Бинарный файл yt-dlp не найден по пути: "${this.ytdlpBinaryPath}".`);
         }
 
+        this.ytdlp = new YtDlp({
+            binaryPath: this.ytdlpBinaryPath,
+            ffmpegPath: this.ffmpegBinaryPath
+        });
+    }
+
+    private getOptionsForDownloadingMp3(): ArgsOptions {
         const options: ArgsOptions = {
             extractAudio: true,
             audioFormat: "mp3",
@@ -18,8 +37,6 @@ export default class YtdlpManager {
 
             embedMetadata: true,
             embedThumbnail: true,
-
-            ffmpegLocation: ffmpegPath as unknown as string,
 
             ignoreErrors: true,
         };
